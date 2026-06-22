@@ -60,17 +60,23 @@ struct CaptionBurner {
                withMediaType: .audio,
                preferredTrackID: kCMPersistentTrackID_Invalid
            ) {
-            // Use the audio track's own valid range (clamped to the video
-            // duration) rather than assuming it spans `asset.duration`; trimmed
-            // or offset assets otherwise throw and would silently lose all sound.
+            // Use the audio track's own valid range rather than assuming it
+            // spans `asset.duration` (trimmed/offset assets otherwise throw),
+            // and insert it at its original start time so leading silence or a
+            // delayed audio offset stays in sync with the video and captions.
             let audioRange = try await sourceAudioTrack.load(.timeRange)
-            let insertDuration = min(audioRange.duration, duration)
-            let insertRange = CMTimeRange(start: audioRange.start, duration: insertDuration)
-            do {
-                try compAudioTrack.insertTimeRange(insertRange, of: sourceAudioTrack, at: .zero)
-            } catch {
-                // Keep the captioned video usable, but don't leave a dangling
-                // empty audio track in the export.
+            let available = duration - audioRange.start
+            let insertDuration = max(.zero, CMTimeMinimum(audioRange.duration, available))
+            if insertDuration > .zero {
+                let sourceRange = CMTimeRange(start: audioRange.start, duration: insertDuration)
+                do {
+                    try compAudioTrack.insertTimeRange(sourceRange, of: sourceAudioTrack, at: audioRange.start)
+                } catch {
+                    // Keep the captioned video usable, but don't leave a
+                    // dangling empty audio track in the export.
+                    composition.removeTrack(compAudioTrack)
+                }
+            } else {
                 composition.removeTrack(compAudioTrack)
             }
         }
