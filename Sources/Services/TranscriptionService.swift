@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Speech
 
@@ -5,6 +6,7 @@ enum TranscriptionError: LocalizedError {
     case notAuthorized
     case recognizerUnavailable
     case onDeviceUnavailable
+    case audioExtractionFailed(Error?)
     case failed(Error)
 
     var errorDescription: String? {
@@ -15,6 +17,8 @@ enum TranscriptionError: LocalizedError {
             return "この言語の音声認識は利用できません。"
         case .onDeviceUnavailable:
             return "オンデバイス音声認識がこの端末/言語では利用できません。"
+        case .audioExtractionFailed(let error):
+            return "動画から音声を取り出せませんでした：\(error?.localizedDescription ?? "不明なエラー")"
         case .failed(let error):
             return "字幕の生成に失敗しました：\(error.localizedDescription)"
         }
@@ -46,7 +50,12 @@ final class TranscriptionService {
             throw TranscriptionError.onDeviceUnavailable
         }
 
-        let request = SFSpeechURLRecognitionRequest(url: url)
+        // `SFSpeechURLRecognitionRequest` expects an audio-file URL, not a video
+        // container, so extract the audio track to an m4a first.
+        let audioURL = try await extractAudio(from: url)
+        defer { try? FileManager.default.removeItem(at: audioURL) }
+
+        let request = SFSpeechURLRecognitionRequest(url: audioURL)
         request.requiresOnDeviceRecognition = true
         request.shouldReportPartialResults = false
         if #available(iOS 16.0, *) {
@@ -73,6 +82,31 @@ final class TranscriptionService {
                 }
             }
         }
+    }
+
+    /// Exports the audio track of a video to a temporary m4a file suitable for
+    /// `SFSpeechURLRecognitionRequest`.
+    private func extractAudio(from videoURL: URL) async throws -> URL {
+        let asset = AVURLAsset(url: videoURL)
+        guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
+            throw TranscriptionError.audioExtractionFailed(nil)
+        }
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("speech-\(UUID().uuidString)")
+            .appendingPathExtension("m4a")
+        try? FileManager.default.removeItem(at: outputURL)
+        export.outputURL = outputURL
+        export.outputFileType = .m4a
+
+        await withCheckedContinuation { continuation in
+            export.exportAsynchronously {
+                continuation.resume()
+            }
+        }
+        guard export.status == .completed else {
+            throw TranscriptionError.audioExtractionFailed(export.error)
+        }
+        return outputURL
     }
 
     private static func requestAuthorization() async -> SFSpeechRecognizerAuthorizationStatus {
