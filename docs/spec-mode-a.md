@@ -30,21 +30,39 @@
 | スタイル | **プリセットを複数用意**（カスタム編集は MVP 外） |
 | 収益化 | **買い切り（インストール課金 / 有料アプリ）**。サブスク・広告は当面なし |
 
-## 技術（提案 — 未確定）
-- iOS / Swift + SwiftUI `[要確認]`
-- 音声認識：Apple Speech Framework（オンデバイス）`[要確認]`
-- 動画処理：AVFoundation `[要確認]`
-- サーバー課金ゼロ・端末内完結 `[要確認]`
+## 技術（確定）
+- プラットフォーム：**iOS のみ**（Android はスコープ外）
+- 言語 / UI：**Swift + SwiftUI**
+- 音声認識：**Apple Speech（オンデバイス）**
+  - iOS 26+：`SpeechAnalyzer` + `SpeechTranscriber`（長尺・ワード単位タイミング）
+  - 下位互換：`SFSpeechRecognizer`（`requiresOnDeviceRecognition = true`）にフォールバック
+- 動画処理：**AVFoundation**（`AVMutableVideoComposition` + Core Animation レイヤで焼き込み、`AVAssetExportSession` で書き出し）
+- サーバー課金ゼロ・**端末内完結**
+
+### 処理パイプライン
+```
+動画入力 (AVAsset)
+  └─ 音声トラック抽出
+       └─ オンデバイス文字起こし → テキスト + タイムスタンプ
+            └─ プリセット適用（フォント / 色 / 位置）
+                 └─ AVMutableVideoComposition + Core Animation で焼き込み
+                      └─ AVAssetExportSession で書き出し
+```
+
+## 実装 / CI（確定）
+- 最低OS：**iOS 17.0**（`SpeechAnalyzer` 利用時は iOS 26+、それ未満は `SFSpeechRecognizer` にフォールバック）
+- プロジェクト生成：**XcodeGen**（`project.yml` をコミットし、`.xcodeproj` は生成物として gitignore）
+- CI：**GitHub Actions（macOS ランナー）** で `xcodegen generate` → `xcodebuild build-for-testing`（アプリ＋テストのコンパイルをゲート）
+- MVP プリセット：**4種**（Clean / Bold / Boxed / Top）。アニメは表示・非表示のフェードのみ
 
 ## 未定事項（TBD）
 | # | 項目 | 内容 |
 |---|---|---|
-| 1 | 対応言語 | 字幕生成の対応言語の範囲 |
-| 2 | スタイル詳細 | プリセットの具体（フォント / 色 / 位置 / アニメ）と個数 |
-| 3 | 動画長・解像度 | 想定する最大動画尺・解像度 |
+| 1 | 対応言語 | MVP は端末ロケール（`Locale.current`）に追従。言語選択UIは後続 |
+| 2 | スタイル拡張 | プリセット追加・カスタム編集（色 / 位置 / アニメ）は後続 |
+| 3 | 動画長・解像度 | 想定する最大動画尺・解像度の上限 |
 | 4 | 価格 | 買い切りの価格設定 |
-| 5 | アプリ名 | 未定 |
-| 6 | 対応OS | iOS 最低バージョン |
+| 5 | アプリ名 | 仮称 "Caption"（未確定） |
 
 ## 確定済み質問（記録）
 1. ターゲットは SNS特化か汎用か → **SNS特化**
