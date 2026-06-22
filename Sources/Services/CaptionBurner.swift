@@ -53,7 +53,11 @@ struct CaptionBurner {
             throw CaptionBurnerError.noVideoTrack
         }
         let fullRange = CMTimeRange(start: .zero, duration: duration)
-        try compVideoTrack.insertTimeRange(fullRange, of: sourceVideoTrack, at: .zero)
+        // Insert the video track's own time range at its original start so
+        // assets whose video track is shorter than, or offset within, the
+        // overall asset duration can still be composited instead of throwing.
+        let videoRange = try await sourceVideoTrack.load(.timeRange)
+        try compVideoTrack.insertTimeRange(videoRange, of: sourceVideoTrack, at: videoRange.start)
 
         if let sourceAudioTrack = try await asset.loadTracks(withMediaType: .audio).first,
            let compAudioTrack = composition.addMutableTrack(
