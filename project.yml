@@ -1,6 +1,6 @@
 name: VideoCaption
 options:
-  bundleIdPrefix: com.example.videocaption
+  bundleIdPrefix: com.tktcorporation
   deploymentTarget:
     iOS: "17.0"
   createIntermediateGroups: true
@@ -21,7 +21,7 @@ targets:
     info:
       path: Supporting/Info.plist
       properties:
-        CFBundleDisplayName: Caption
+        CFBundleDisplayName: Teloppi
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -29,7 +29,7 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: "NO"
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.videocaption.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.tktcorporation.teloppi
   VideoCaptionTests:
     type: bundle.unit-test
     platform: iOS
@@ -40,7 +40,7 @@ targets:
       - target: VideoCaption
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.videocaption.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.tktcorporation.teloppi.tests
 schemes:
   VideoCaption:
     build:
